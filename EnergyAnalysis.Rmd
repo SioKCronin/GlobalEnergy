@@ -1,0 +1,1012 @@
+---
+title: "Global Energy Analysis"
+author: "Siobhán K Cronin"
+date: "11/15/2016"
+output: html_document
+---
+
+## Data
+
+The following analysis is built upon the International Energy Agency's (IEA) 
+IEA Headline Energy Data, which includes product data for 14 energy balance 
+flows in kilotons of oil equivalent (ktoe) for 9 energy products over the 
+years 1971-2014. 
+
+The IEA is an independent agency that works closely with the Organisation for 
+Economic Co-operation and Development (OECD), an intergovernmental economic 
+organisation with 35 member countries, founded in 1961 to stimulate economic 
+progress and world trade (Wikipedia "OECD" 11/15/16). 
+
+This dataset can be downloaded from the IEA's website: 
+https://www.iea.org/statistics/
+
+### Overview
+
+```{r Libraries, include=FALSE}
+library(dplyr)
+library(reshape2)
+library(gridExtra)
+library(grid)
+library(ggplot2)
+library(lattice)
+library(scales)
+```
+
+```{r Functions, message=FALSE, warning=FALSE, include=FALSE}
+
+# Functions
+
+clean_df_column_names <- function(df) {
+  # Make syntatically valid columnn names out of character vectors 
+  for (i in names(df)) {
+    names(df)[names(df) == i] <- make.names(i)
+  }
+  # Return dataframe
+  df
+}
+
+cast_as_numeric <- function(df) {
+  # Cast level names of dataframe as numeric
+  for (i in names(df)) {
+      df[[i]] <- as.numeric(df[[i]])
+  }
+  # Return dataframe
+  df
+}
+
+create_ggplot_timeseries <- function(df, y_var, limits, title) {
+  # Plot a timeseries in ggplot
+  ggplot(df, aes(x = Year, y = y_var)) + 
+  scale_x_date(date_breaks = '10 years', date_labels = '%Y') +
+  scale_y_continuous(limits = limits, breaks = pretty_breaks(10)) +
+  geom_line() +
+  ylab(title) 
+}
+
+calculate_total_net_flow <- function(df, country) {
+  # Calculate sum of annual differences between exports and imports
+  sub <- subset(df, Country == country)
+  sum(abs(sub$Exports..ktoe.) - sub$Imports..ktoe.)
+}
+
+```
+
+```{r Load df, include=FALSE}
+# Summarize data 
+setwd('~/Udacity/P4/Energy')
+energy <- read.csv('Energy.csv')
+df = data.frame(energy)
+```
+
+```{r Remove NA, include=FALSE}
+# Remove columns that have empty / NA data
+x <- subset(df, select = -c(X, X.1, X.2, X.3, X.4))
+df <- x
+```
+
+```{r}
+head(df,2)
+names(df)
+unique(df$Country)
+unique(df$Product)
+unique(df$Flow)
+```
+This datset contains 52 variables with 5,895 observations, with annual data encompassing 1971 to 2014 (5 variables were excluded because they were empty; these were projected placeholder variables for 2015 total and quarterly data). The data are condusive for within-country comparisons between energy products and between-country comparisions of specific energy products. In addition to country data, world totals and regional data are also provided. 
+
+To capture some of the breadth of these data, I have organized this report by analyses pertainting to USA, World and Regions. 
+
+### USA 
+
+```{r Data for oil, include=FALSE}
+
+# Subset data
+df.oil_imports_exports <- subset(
+  df, Product == 'Oil products' & 
+    (Flow == 'Imports (ktoe)' | Flow == 'Exports (ktoe)')
+  )
+
+# Melt data
+melted_oil_ie <- melt(
+  df.oil_imports_exports, 
+  id = c('Country', 'Product', 'Flow'), 
+  measured = c('X1971', 'X1972', 'X1973', 'X1974', 'X1975', 'X1976', 'X1977', 
+               'X1978', 'X1979', 'X1980', 'X1981', 'X1982', 'X1983', 'X1984', 
+               'X1985', 'X1986', 'X1987', 'X1988', 'X1989', 'X1990', 'X1991', 
+               'X1992', 'X1993', 'X1994', 'X1995', 'X1996', 'X1997', 'X1998', 
+               'X1999', 'X2000', 'X2001', 'X2002', 'X2003', 'X2004', 'X2007', 
+               'X2008', 'X2009', 'X2010', 'X2011', 'X2012', 'X2013', 'X2014'))
+
+# Remove 'X' from each year value
+melted_oil_ie <- transform(melted_oil_ie, Year = sub('X', '', variable))
+
+# Cast data
+casted_oil_ie <- dcast(melted_oil_ie, Country+Year ~ Flow)
+
+# Clean column names
+df.imports_exports <- clean_df_column_names(casted_oil_ie)
+
+# Create numeric
+df.imports_exports[3:4] <- cast_as_numeric(df.imports_exports[3:4])
+
+# Set Year as date
+df.imports_exports$Year <- as.Date(df.imports_exports$Year, "%Y")
+
+# Create USA dataframe
+df.imports_exports_USA <- subset(df.imports_exports, Country == 'United States')
+```
+
+```{r Data for USA products, include=FALSE}
+
+df.USA <- subset(
+  df, Country == 'United States' & Flow == 'Imports (ktoe)')
+
+melted_USA <- melt(
+  df.USA, 
+  id = c('Country', 'Product', 'Flow'), 
+  measured = c('X1971', 'X1972', 'X1973', 'X1974', 'X1975', 'X1976', 'X1977', 
+               'X1978', 'X1979', 'X1980', 'X1981', 'X1982', 'X1983', 'X1984', 
+               'X1985', 'X1986', 'X1987', 'X1988', 'X1989', 'X1990', 'X1991', 
+               'X1992', 'X1993', 'X1994', 'X1995', 'X1996', 'X1997', 'X1998', 
+               'X1999', 'X2000', 'X2001', 'X2002', 'X2003', 'X2004', 'X2007', 
+               'X2008', 'X2009', 'X2010', 'X2011', 'X2012', 'X2013', 'X2014'))
+
+# Remove 'X' from each year value
+melted_USA <- transform(melted_USA, Year = sub('X', '', variable))
+
+# Cast USA
+casted_USA <- dcast(melted_USA, Country+Year ~ Product)
+
+# Clean column names
+casted_USA <- clean_df_column_names(casted_USA)
+
+# Set Year a data
+casted_USA$Year <- as.Date(casted_USA$Year, "%Y")
+
+# Create numeric 
+casted_USA[3:11] <- cast_as_numeric(casted_USA[3:11])
+
+```
+
+The dataset contains 16 levels of energy flow categories, and I chose to focus my analysis on imports and exports. To get a snapshot of US energy imports, I plotted a pie chart of 2014 product percentages. To do so, I excluded two products that had no data (Heat and Nuclear), and combined the three smallest imported products (Crude, Renewables, and Electricity) for greater legilibility. 
+
+```{r 2014 USA import pie chart, echo=FALSE}
+
+melted_USA_import <- subset(
+  melted_USA, Flow == 'Imports (ktoe)' & variable == 'X2014'
+  )
+
+# Plot IMPORT pie chart
+slices <- c(as.integer(melted_USA_import$value)) 
+slices <- slices[-c(5,8,9)]
+small_values <- sum(slices[c(1,5,6)])
+slices <- slices[-c(1,5,6)]
+slices <- c(slices, small_values) 
+lbls <- c("Crude,NGL and feedstocks", "Oil products", 
+          "Natural gas","Coal, Renew., Electric.")
+
+pct <- round(slices/sum(slices)*100)
+lbls <- paste(lbls, pct) # add percents to labels 
+lbls <- paste(lbls,"%",sep="") # ad % to labels 
+pie(slices,labels = lbls, col=rainbow(length(lbls)),
+  	main="2014 USA energy imports (% of total)")
+
+```
+
+Looking just at this 2014 snapshot, Crude makes up a whopping 75% of US energy imports. The supporting documentation for this dataset defined crude as crude oil, natural gas liquids, refinery feedstocks, and hydrocarbons. I wanted to see if these energy product proportions persisted across the entire timeframe of the dataset, so I plotted the longitduinal data of each energy product import together.
+
+```{r Plot of USA energy products, echo=FALSE}
+
+ggplot() + 
+  geom_line(data = casted_USA, 
+            aes(x = Year, y = Electricity, color = "Electricity"), 
+            group = 1) +
+  geom_line(data = casted_USA, 
+            aes(x = Year, y = Nuclear, color = "Nuclear"), 
+            group = 1)  +
+  geom_line(data = casted_USA, 
+            aes(x = Year, y = Oil.products, color = "Oil"), 
+            group = 1) +
+  geom_line(data = casted_USA, 
+            aes(x = Year, y = Coal..peat.and.oil.shale, color = "Coal"), 
+            group = 1) +
+  geom_line(data = casted_USA, 
+            aes(x = Year, y = Natural.gas, color = "Gas"), 
+            group = 1) +
+  geom_line(data = casted_USA, 
+            aes(x = Year, y = Crude.NGL.and.feedstocks, color = "Crude"), 
+            group = 1) +
+  geom_line(data = casted_USA, 
+            aes(x = Year, y = Renewables.and.waste, color = "Renewables"), 
+            group = 1) +
+  geom_line(data = casted_USA, 
+            aes(x = Year, y = Heat, color = "Heat"), 
+            group = 1) +
+  xlab('Year') +
+  ylab('Product import in ktoe') + 
+  scale_x_date(date_breaks = '10 years', date_labels = '%Y') +
+  scale_y_continuous(limits = c(0, 620000), breaks = pretty_breaks(10))
+
+```
+
+Crude imports surpass the next leading energy import by a large margin, and seem worthy of further investigation. Before analyzing them further, I wanted to see the dynamics of the other energy products in a plot where crude was removed so as not to skew the magnitude of the scale. 
+
+```{r USA energy, echo=FALSE}
+
+ggplot() + 
+  geom_line(data = casted_USA, 
+            aes(x = Year, y = Electricity, color = "Electricity"), 
+            group = 1) +
+  geom_line(data = casted_USA, 
+            aes(x = Year, y = Nuclear, color = "Nuclear"), 
+            group = 1)  +
+  geom_line(data = casted_USA, 
+            aes(x = Year, y = Oil.products, color = "Oil"), 
+            group = 1) +
+  geom_line(data = casted_USA, 
+            aes(x = Year, y = Coal..peat.and.oil.shale, color = "Coal"), 
+            group = 1) +
+  geom_line(data = casted_USA, 
+            aes(x = Year, y = Natural.gas, color = "Gas"), 
+            group = 1) +
+  geom_line(data = casted_USA, 
+            aes(x = Year, y = Renewables.and.waste, color = "Renewables"), 
+            group = 1) +
+  geom_line(data = casted_USA, 
+            aes(x = Year, y = Heat, color = "Heat"), 
+            group = 1) +
+  xlab('Year') +
+  ylab('Product import in ktoe') + 
+  scale_x_date(date_breaks = '10 years', date_labels = '%Y') +
+  scale_y_continuous(limits = c(0, 140000), breaks = pretty_breaks(10))
+
+```
+
+This helped me see some interesting patterns in gas (green) and oil (purple), particularly their mutual rise and fall during the second half of the timeframe. I isolated these two products to look more closely at their interaction.  
+
+```{r Correlation between USA gas and oil imports, echo=FALSE, message=FALSE, warning=FALSE}
+
+ggplot() + 
+  geom_line(data = casted_USA, 
+            aes(x = Year, y = Oil.products, color = "Oil"), 
+            group = 1) +
+  geom_line(data = casted_USA, 
+            aes(x = Year, y = Natural.gas, color = "Gas"), 
+            group = 1) +
+  xlab('Year') +
+  ylab('Product import in ktoe') +  
+  scale_x_date(date_breaks = '4 years', date_labels = '%Y') +
+  scale_y_continuous(limits = c(15000, 140000), breaks = pretty_breaks(5))
+
+```
+
+I noted the drop off of imports around 2008, and would be interested to investigate further to see if this could be recession related (perhaps by comparing other OECD countries during this time period).
+
+#### US oil imports and exports 
+
+In order to continue moving through my dataset, I switched my attention to comparing US imports with exports. When it comes to energy products, imports only tell half of the story, and I was curious to see if the US showed net deficits or net gains. 
+
+I chose to focus my attention on oil.Oil in this context includes refinery gas, ethane, aviation gasoline, motor gasoline, jet fuels, kerosene, gas/disel oil, fuel oil, and other oil products.  
+
+```{r US oil Imports vs. Exports, echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(df.imports_exports_USA, aes(x = Year)) +
+  ylab('US oil (ktoe)') +
+  geom_line(aes(y = abs(Exports..ktoe.), color = 'Export')) + 
+  geom_line(aes(y = Imports..ktoe., color = 'Import')) +                      
+  scale_y_continuous(limits = c(0, 140000), breaks = pretty_breaks(10)) +
+  scale_y_continuous(limits = c(0, 140000), breaks = pretty_breaks(10)) 
+  
+```
+
+I could immediately see two distinct periods of time:  1) when imports were greater than exports, and 2) when exports were greater than imports. I shaded these in to see them more clearly. 
+
+```{r USA oil import-export shaded in below 2009, echo=FALSE, message=FALSE, warning=FALSE}
+
+ggplot(df.imports_exports_USA, aes(x = Year)) +
+  ylab('US oil (ktoe)') +
+  geom_line(aes(y = abs(Exports..ktoe.), color = 'Export')) + 
+  geom_line(aes(y = Imports..ktoe., color = 'Import')) +      
+  scale_x_date(limits = c(as.Date('1971', '%Y'), as.Date('2013', '%Y')), 
+               date_breaks = '5 years', date_labels = '%Y') +
+  geom_ribbon(data=subset(df.imports_exports_USA, Year < as.Date('2009', '%Y')), 
+              aes(x = Year, ymin=abs(Exports..ktoe.), ymax=Imports..ktoe.), 
+              fill="red", alpha="0.5") +
+  geom_ribbon(data=subset(df.imports_exports_USA, Year >= as.Date('2008', '%Y')), 
+              aes(x = Year, ymin=abs(Exports..ktoe.), ymax=Imports..ktoe.), 
+              fill="blue", alpha="0.5") +
+   scale_y_continuous(limits = c(0, 140000), breaks = pretty_breaks(10)) +
+  annotate("text", x = as.Date('1980', '%Y'), 
+           y = 40000, label = "Net deficit") + 
+  scale_y_continuous(limits = c(0, 140000), breaks = pretty_breaks(10)) +
+  annotate("text", x = as.Date('2013', '%Y'), 
+           y = 100000, label = "Net gain")
+  
+```
+
+```{r Quantify the gains from 2009 onwards, message=FALSE, warning=FALSE, include=FALSE}
+
+# Calculate net gain 
+
+export<- subset(
+  df.imports_exports_USA$Exports..ktoe., 
+  df.imports_exports_USA$Year < as.Date('2014', '%Y') & 
+    df.imports_exports_USA$Year > as.Date('2010', '%Y')
+  )
+import <- subset(
+  df.imports_exports_USA$Imports..ktoe., 
+  df.imports_exports_USA$Year < as.Date('2014', '%Y') & 
+    df.imports_exports_USA$Year > as.Date('2010', '%Y')
+  )
+
+export <- abs(export)
+
+netgain <- sum(export - import)
+```
+
+I then calculated and plotted the total (ktoe) of the observed net gain. 
+
+```{r Plot net gain, echo=FALSE, message=FALSE, warning=FALSE}
+
+ggplot(df.imports_exports_USA, aes(x = Year)) +
+  ylab('Product flow (ktoe)') +
+  geom_line(aes(y = abs(Exports..ktoe.), color = 'Export')) + 
+  geom_line(aes(y = Imports..ktoe., color = 'Import')) +                     
+  scale_x_date(limits = c(as.Date('1995', '%Y'), as.Date('2013', '%Y')), 
+               date_breaks = '2 years', date_labels = '%Y') +
+  scale_y_continuous(limits = c(0, 140000), breaks = pretty_breaks(10)) +
+  geom_ribbon(data=subset(df.imports_exports_USA, Year >= as.Date('2009', '%Y')), 
+              aes(x = Year, ymin=abs(Exports..ktoe.),ymax=Imports..ktoe.), 
+              fill="blue", alpha="0.5") +
+  annotate("text", x = as.Date('2012', '%Y'), 
+           y = 100000, label = "192203 ktoe") + 
+  annotate("text", x = as.Date('2002', '%Y'), 
+           y = 60000, label = "Parallel growth") + 
+  annotate("text", x = as.Date('2009', '%Y'), 
+           y = 70000, label = "Inflection")
+```
+
+I was intrigued by the parallel rise of imports and exports between around 1995 to 2006, so I calculated and plotted their correlation for this period. 
+
+```{r Calculate import-export regression, echo=TRUE, message=FALSE, warning=FALSE}
+
+export<- subset(
+  df.imports_exports_USA$Exports..ktoe., 
+  df.imports_exports_USA$Year < as.Date('2006', '%Y') & 
+    df.imports_exports_USA$Year > as.Date('1995', '%Y')
+  )
+
+import <- subset(
+  df.imports_exports_USA$Imports..ktoe., 
+  df.imports_exports_USA$Year < as.Date('2006', '%Y') & 
+    df.imports_exports_USA$Year > as.Date('1995', '%Y')
+  )
+
+export <- abs(export)
+
+lm(export~import)
+```
+
+```{r Plot regression with coefficient, echo=FALSE, message=FALSE, warning=FALSE}
+
+ggplot(df.imports_exports_USA, aes(x = Year)) +
+  ylab('Product flow (ktoe)') +
+  geom_line(aes(y = abs(Exports..ktoe.), color = 'Export')) + 
+  geom_line(aes(y = Imports..ktoe., color = 'Import')) +  
+  geom_ribbon(data=subset(
+    df.imports_exports_USA, 
+    Year < as.Date('2009', '%Y') & Year > as.Date('1994', '%Y')), 
+    aes(x = Year, ymin=abs(Exports..ktoe.),ymax=Imports..ktoe.), 
+    fill="red", 
+    alpha="0.5") +        
+  scale_x_date(limits = c(as.Date('1994', '%Y'), as.Date('2013', '%Y')), 
+               date_breaks = '2 years', 
+               date_labels = '%Y') +
+  scale_y_continuous(limits = c(0, 140000), breaks = pretty_breaks(10)) +
+  annotate("text", x = as.Date('2012', '%Y'), y = 100000, label = "Net gain") + 
+  annotate("text", x = as.Date('2004', '%Y'), y = 70000, label = "p = 0.22") + 
+  annotate("text", x = as.Date('2009', '%Y'), y = 70000, label = "Inflection") 
+```
+
+Their low correlation coeffecient led me to believe that one could not be used as a suitable predictor of the other for this period. 
+
+#### US crude
+
+I shifted my attention back to crude, and plotted US crude imports against US crude exports. 
+
+```{r Crude oil, message=FALSE, warning=FALSE, include=FALSE}
+
+# Subset data
+df.ie_crude <- subset(df, Product == 'Crude,NGL and feedstocks' & 
+                        (Flow == 'Imports (ktoe)' | Flow == 'Exports (ktoe)'))
+
+# Melt data
+melted_ie_crude <- melt(
+  df.ie_crude, 
+  id = c('Country', 'Product', 'Flow'), 
+  measured = c('X1971', 'X1972', 'X1973', 'X1974', 'X1975', 'X1976', 'X1977', 
+               'X1978', 'X1979', 'X1980', 'X1981', 'X1982', 'X1983', 'X1984', 
+               'X1985', 'X1986', 'X1987', 'X1988', 'X1989', 'X1990', 'X1991', 
+               'X1992', 'X1993', 'X1994', 'X1995', 'X1996', 'X1997', 'X1998', 
+               'X1999', 'X2000', 'X2001', 'X2002', 'X2003', 'X2004', 'X2007', 
+               'X2008', 'X2009', 'X2010', 'X2011', 'X2012', 'X2013', 'X2014'))
+
+# Remove 'X' from each year value
+melted_ie_crude <- transform(melted_ie_crude, Year = sub('X', '', variable))
+
+# Cast data
+casted_ie_crude <- dcast(melted_ie_crude, Country+Year ~ Flow)
+
+# Clean column names
+df.ie_crude <- clean_df_column_names(casted_ie_crude)
+
+# Create numeric
+df.ie_crude[3:4] <- cast_as_numeric(df.ie_crude[3:4])
+
+# Set Year a data
+df.ie_crude$Year <- as.Date(df.ie_crude$Year, "%Y")
+
+# Create USA dataframe
+df.ie_crude_USA <- subset(df.ie_crude, Country == 'United States')
+
+```
+
+```{r US crude, echo=FALSE, message=FALSE, warning=FALSE}
+
+ggplot(df.ie_crude_USA, aes(x = Year)) +
+  ylab('US crude (ktoe)') +
+  geom_line(aes(y = abs(Exports..ktoe.), color = 'Export')) + 
+  geom_line(aes(y = Imports..ktoe., color = 'Import')) +                    
+  geom_ribbon(
+    data=subset(df.ie_crude_USA, Year > as.Date('1970', '%Y')), 
+    aes(x = Year, ymin=abs(Exports..ktoe.),ymax=Imports..ktoe.), 
+    fill="red", 
+    alpha="0.5") +
+   scale_y_continuous(
+     limits = c(0, 620000), 
+     breaks = pretty_breaks(10)) +
+  annotate("text", x = as.Date('2004', '%Y'), 
+           y = 350000, 
+           label = "Net deficit")
+
+```
+
+The scale of the US crude net deficit was quite suprising, with exports only scarecly registering in the late 1990s and after around 2008. Also, as viewed initially in my import comparison, the magnitude of crude imports was far greater than what I had observed in oil. To help me visualize these relative magnitudes I plotted my US oil imports and exports against a backrdop of US crude imports and exports. 
+
+```{r Compare crude and oil by scale, echo=FALSE, message=FALSE, warning=FALSE}
+
+ggplot(df.ie_crude_USA, aes(x = Year)) +
+  xlab(("Year"))+
+  ylab('Product flow (ktoe)') +
+  geom_line(aes(y = abs(Exports..ktoe.), color = 'Export')) + 
+  geom_line(aes(y = Imports..ktoe., color = 'Import')) +                     
+  geom_ribbon(
+    data=subset(df.ie_crude_USA, Year > as.Date('1970', '%Y')), 
+    aes(x = Year, ymin=abs(Exports..ktoe.),ymax=Imports..ktoe.), 
+    fill="red", 
+    alpha="0.1") +
+  scale_y_continuous(limits = c(0, 620000), breaks = pretty_breaks(10)) +
+  geom_line(
+    aes(y = abs(df.imports_exports_USA$Exports..ktoe.), 
+        color = 'Export')) + 
+  geom_line(
+    aes(y = df.imports_exports_USA$Imports..ktoe., 
+        color = 'Import')) +  
+  geom_ribbon(
+    data=subset(
+      df.imports_exports_USA, Year < as.Date('2009', '%Y') & 
+        Year > as.Date('1970', '%Y')), 
+    aes(x = Year, ymin=abs(Exports..ktoe.),ymax=Imports..ktoe.), 
+    fill="red", 
+    alpha="0.7") +        
+  scale_x_date(limits = c(as.Date('1970', '%Y'), as.Date('2013', '%Y')), 
+               date_breaks = '5 years', 
+               date_labels = '%Y') +
+  geom_ribbon(
+    data=subset(
+      df.imports_exports_USA, Year >= as.Date('2009', '%Y')), 
+    aes(x = Year, ymin=abs(Exports..ktoe.),ymax=Imports..ktoe.), 
+    fill="blue", 
+    alpha="0.7") + 
+  annotate("text", x = as.Date('1993', '%Y'), 
+           y = 150000, 
+           label = "US oil (foreground) vs. US crude (background)")
+```
+
+### World  
+
+```{r World imports, message=FALSE, warning=FALSE, include=FALSE}
+
+# Plot and select the one with the highest average 
+
+df.world <- subset(df, Country == 'World' & Flow == 'Imports (ktoe)')
+
+melted_world <- melt(
+  df.world, id = c('Country', 'Product', 'Flow'), 
+  measured = c('X1971', 'X1972', 'X1973', 'X1974', 'X1975', 'X1976', 'X1977', 
+               'X1978', 'X1979', 'X1980', 'X1981', 'X1982', 'X1983', 'X1984', 
+               'X1985', 'X1986', 'X1987', 'X1988', 'X1989', 'X1990', 'X1991', 
+               'X1992', 'X1993', 'X1994', 'X1995', 'X1996', 'X1997', 'X1998', 
+               'X1999', 'X2000', 'X2001', 'X2002', 'X2003', 'X2004', 'X2007', 
+               'X2008', 'X2009', 'X2010', 'X2011', 'X2012', 'X2013', 'X2014'))
+
+# Remove 'X' from each year value
+melted_world <- transform(melted_world, Year = sub('X', '', variable))
+
+# Cast world
+casted_world <- dcast(melted_world, Country+Year ~ Product)
+
+# Clean column names
+casted_world <- clean_df_column_names(casted_world)
+
+# Set Year a data
+casted_world$Year <- as.Date(casted_world$Year, "%Y")
+
+# Create numeric 
+casted_world[3:11] <- cast_as_numeric(casted_world[3:11])
+
+```
+
+My US analysis led me to wonder how US energy compared to world totals. I started by plotting world energy imports.  
+
+```{r Bump chart, echo=FALSE, message=FALSE, warning=FALSE}
+
+ggplot() + 
+  geom_line(data = casted_world, 
+            aes(x = Year, y = Electricity, color = "Electricity"), 
+            group = 1) +
+  geom_line(data = casted_world, 
+            aes(x = Year, y = Nuclear, color = "Nuclear"), 
+            group = 1)  +
+  geom_line(data = casted_world, 
+            aes(x = Year, y = Oil.products, color = "Oil"), 
+            group = 1) +
+  geom_line(data = casted_world, 
+            aes(x = Year, y = Coal..peat.and.oil.shale, color = "Coal"), 
+            group = 1) +
+  geom_line(data = casted_world, 
+            aes(x = Year, y = Natural.gas, color = "Gas"), 
+            group = 1) +
+  geom_line(data = casted_world, 
+            aes(x = Year, y = Crude.NGL.and.feedstocks, color = "Crude"), 
+            group = 1) +
+  geom_line(data = casted_world, 
+            aes(x = Year, y = Renewables.and.waste, color = "Renewables"), 
+            group = 1) +
+  geom_line(data = casted_world, 
+            aes(x = Year, y = Heat, color = "Heat"), 
+            group = 1) +
+  xlab('Year') +
+  ylab('World energy imports (ktoe)') + 
+  scale_x_date(date_breaks = '5 years', date_labels = '%Y') +
+  scale_y_continuous(limits = c(0, 1200000), breaks = pretty_breaks(10))
+
+```
+
+#### World oil 
+
+```{r Data2, include=FALSE}
+
+# Create World oil dataframe
+df.imports_exports_world <- subset(df.imports_exports, Country == 'World')
+
+```
+Oil led the pack as the leading world energy import, so I singled it for closer examination. 
+
+```{r World oil imports, echo=FALSE, message=FALSE, warning=FALSE}
+
+ggplot(df.imports_exports_world, aes(x = Year, y = Imports..ktoe.)) + 
+  scale_x_date(date_breaks = '10 years', date_labels = '%Y') +
+  scale_y_continuous(limits = c(0, 1200000), breaks = pretty_breaks(10)) +
+  geom_line(color = 'blue') +
+  ylab("World oil Imports (ktoe)")
+```
+
+World oil imports see a steady rise over time. I wanted to see if this was also true for exports, so I plotted them side by side. 
+
+```{r World oil imports2, echo=FALSE, message=FALSE, warning=FALSE}
+
+ggplot(df.imports_exports_world, aes(x = Year)) + 
+  geom_line(aes(y = abs(Exports..ktoe.)), color = 'red') + 
+  geom_line(aes(y = Imports..ktoe.), color = 'blue') +  
+  scale_x_date(date_breaks = '10 years', date_labels = '%Y') +
+  scale_y_continuous(limits = c(0, 1350000), breaks = pretty_breaks(10)) +
+  ylab("World oil Imports & Exports (ktoe)") 
+
+```
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+export <- df.imports_exports_world$Exports..ktoe.
+import <- df.imports_exports_world$Imports..ktoe.
+lm(import~export)
+```
+
+Unlike the import-export disarpity I observed in US crude, world oil imports and exports seem to advance in lockstep. Their correlation coefficient was incredibly strong (-0.96).
+
+I was curiou about the total net gain acculmulated over time, so I calculated and plotted that directly. 
+
+```{r Quantify net flow, echo=TRUE, message=FALSE, warning=FALSE}
+netgain <- sum(abs(df.imports_exports_world$Exports..ktoe.) - 
+                 df.imports_exports_world$Imports..ktoe.)
+
+netgain
+```
+
+```{r Plot net flow, echo=FALSE, message=FALSE, warning=FALSE}
+
+ggplot(df.imports_exports_world, aes(x = Year)) + 
+  geom_line(aes(y = abs(Exports..ktoe.)), color = 'red') + 
+  geom_line(aes(y = Imports..ktoe.), color = 'blue') +  
+  geom_ribbon(
+    data=subset(df.imports_exports_world, Year < as.Date('2015', '%Y') & 
+                  Year > as.Date('1970', '%Y')),
+    aes(x = Year, ymin=Imports..ktoe., ymax=abs(Exports..ktoe.)), 
+    fill="blue", 
+    alpha="0.5") +
+  scale_x_date(date_breaks = '5 years', date_labels = '%Y') +
+  scale_y_continuous(limits = c(0, 1400000), breaks = pretty_breaks(10)) +
+  annotate(
+    "text", 
+    x = as.Date('1989', '%Y'), 
+    y = 900000, 
+    label = "2586108 ktoe") + 
+  ylab("World oil Imports & Exports (ktoe)")
+```
+
+#### US vs. World (oil imports)
+
+With over 2.5 Million ktoe in oil net gains, world totals paint a much fuller picture of the total oil market. To help me visualize this scale, I plotted US oil imports next to World oil imports. 
+
+```{r Plots3, echo=FALSE, message=FALSE, warning=FALSE}
+
+p1 <- create_ggplot_timeseries(
+  df.imports_exports_USA, 
+  df.imports_exports_USA$Imports..ktoe.,
+  c(0, 1200000),
+  "USA oil Imports (ktoe)"
+)   
+
+p2 <- create_ggplot_timeseries(
+  df.imports_exports_world, 
+  df.imports_exports_world$Imports..ktoe., 
+  c(0, 1200000), 
+  "World oil Imports (ktoe)"
+)   
+
+grid.arrange(p1, p2, ncol=2)
+
+```
+
+### Regions 
+
+In addition to data on specific OECD countries, this dataset includes regional data from non-OECD nations.
+
+```{r 2014 oil imports data, message=FALSE, warning=FALSE, include=FALSE}
+
+df.imports_exports_w <- subset(
+  df.imports_exports,  
+   (Country %in% c('Africa',
+                  'Middle East',
+                  'Non-OECD Americas',
+                  'Asia (including China)',
+                  'Non-OECD Europe and Eurasia') &
+                  Year == as.Date("2014", "%Y")
+))
+
+```
+
+```{r 2014 oil imports plot, echo=FALSE, message=FALSE, warning=FALSE}
+
+ggplot(df.imports_exports_w, aes(x = Country, y = Imports..ktoe.)) +
+  geom_bar(stat = "identity", color = "white", fill = "blue") +
+  scale_x_discrete(
+  labels = c("Africa", 
+             "Asia", 
+             "Middle East",
+             "Americas",
+             "Europe + Eurasia",
+             "OECD")
+  ) +
+  scale_y_continuous(
+    limits = c(0, 350000), 
+    breaks = pretty_breaks(10), 
+    name = "2014 oil imports by region")
+
+```
+
+```{r Add OECD, message=FALSE, warning=FALSE, include=FALSE}
+df.imports_exports_world <- subset(
+  df.imports_exports,  
+  (Country %in% c('Africa',
+                  'Middle East',
+                  'Non-OECD Americas',
+                  'Asia (including China)',
+                  'Non-OECD Europe and Eurasia',
+                  'OECD Total')) &
+                  Year == as.Date("2014", "%Y")
+)
+```
+
+```{r Regional oil imports and exports, message=FALSE, warning=FALSE, include=FALSE}
+
+g1 <- ggplot(
+    df.imports_exports_world, 
+    aes(x = Country, y = Imports..ktoe.)
+  ) +
+  geom_bar(
+    stat = "identity", fill = "blue") + 
+  scale_x_discrete(
+    name = 'Region',
+    labels = c("Africa", 
+               "Asia", 
+               "Middle East",
+               "Americas",
+               "Europe + Eurasia",
+               "OECD")
+  ) +
+  scale_y_continuous(
+    limits = c(0, 600000), 
+    name = '2014 oil imports (ktoe)', 
+    labels = comma
+  )
+  
+g2 <- ggplot(df.imports_exports_world, 
+  aes(x = Country, y = abs(Exports..ktoe.))) +
+  geom_bar(stat = "identity", fill = "red") + 
+  scale_x_discrete(
+    name = 'Region',
+    labels = c("Africa", 
+               "Asia", 
+               "Middle East",
+               "Americas",
+               "Europe + Eurasia",
+               "OECD")
+  ) +
+  scale_y_continuous(
+    limits = c(0, 600000), 
+    name = '2014 oil exports (ktoe)', 
+    labels = comma
+  )
+  
+```
+
+For comparison, I plotted OECD imports and exports alongside the non-OECD regions. 
+
+```{r Regional oil imports and exports plot, echo=FALSE, message=FALSE, warning=FALSE}
+grid.arrange(g1, g2, ncol=1)
+```
+
+#### Regional percentages of total oil net gain 
+
+From these barcharts it was difficult to determine which country experienced the greatest oil net gain, so I calculated and plotted this directly as a pie chart. 
+
+Plotted in the pie cart below are the percentages of total positive regional net flow for oil from 1971-2014. These were calculated by subtracting crude imports from crude exports for each of the listed regions. The percentage listed for each region is that region's total crude net flow for all years divided by the total positive crude net gain for all regions for all years (their slice of the regional net crude gain pie). 
+
+I removed Asia and OECD from the pie chart, as these two regions showed negative net oil flow. 
+
+```{r Regional net flow pie chart, echo=FALSE, message=FALSE, warning=FALSE}
+
+#Calculate regional net flow
+o1 <- calculate_total_net_flow(df.imports_exports, "Africa")
+o2 <- calculate_total_net_flow(df.imports_exports, "Asia (including China)")
+o3 <- calculate_total_net_flow(df.imports_exports, "Middle East")
+o4 <- calculate_total_net_flow(df.imports_exports, "Non-OECD Americas")
+o5 <- calculate_total_net_flow(df.imports_exports, "Non-OECD Europe and Eurasia")
+o6 <- calculate_total_net_flow(df.imports_exports, "OECD Total")
+
+# Determine who has positive total net flow
+slices <- c(o1, o2, o3, o4, o5, o6) 
+
+# Remove Asia (o2) and OECD Total (o6)
+slices <- c(o1, o3, o4, o5)
+
+# Plot pie chart
+lbls <- c("Africa", "Middle East", "Americas", 
+          "Europe and Eurasia")
+pct <- round(slices/sum(slices)*100)
+lbls <- paste(lbls, pct) # add percents to labels 
+lbls <- paste(lbls,"%",sep="") # ad % to labels 
+pie(slices,labels = lbls, col=rainbow(length(lbls)),
+  	main="Non-OECD regional percentages of total oil net gain (1971-2014)")
+
+```
+
+As I expected, the Middle East is in the lead with 44% of all net positive oil flow across regions. I was curious to see if this was also true for crude. 
+
+```{r Calculate regional crude net flow, message=FALSE, warning=FALSE, include=FALSE}
+
+c1 <- calculate_total_net_flow(df.ie_crude, "Africa")
+c2 <- calculate_total_net_flow(df.ie_crude, "Asia (including China)")
+c3 <- calculate_total_net_flow(df.ie_crude, "Middle East")
+c4 <- calculate_total_net_flow(df.ie_crude, "Non-OECD Americas")
+c5 <- calculate_total_net_flow(df.ie_crude, "Non-OECD Europe and Eurasia")
+c6 <- calculate_total_net_flow(df.ie_crude, "OECD Total")
+```
+
+```{r Calculate regional crude net flow2, echo=FALSE, message=FALSE, warning=FALSE}
+
+# Determine who has positive total net flow
+slices <- c(c1, c2, c3, c4, c5, c6) 
+
+# Remove Asia (c2) and OECD Total (c6)
+slices <- c(c1, c3, c4, c5)
+
+# Plot pie chart
+lbls <- c("Africa", "Middle East", "Americas", 
+          "Europe and Eurasia")
+pct <- round(slices/sum(slices)*100)
+lbls <- paste(lbls, pct) # add percents to labels 
+lbls <- paste(lbls,"%",sep="") # ad % to labels 
+pie(slices,labels = lbls, col=rainbow(length(lbls)),
+  	main="Non-OECD regional percentages of total crude net gain (1971-2014)")
+```
+
+For crude, the Middle East leads by an even bigger margin, with Africa, the second greatest percentage, coming in at a third of the Middle East's percentage. Once again, Asia and OECD were ommitted from this barchart, as each had negative net crude flow. 
+
+#### US vs. OECD (crude flow)
+
+Given the negative net crude for US and OECD, I wanted to see the percentage of negative OECD crude flow that could be accounted for by the US crude net deficit. 
+
+```{r Plot OECD crude flow}
+
+# Create OECD dataframe
+df.ie_crude_OECD <- subset(df.ie_crude, Country == 'OECD Total')
+
+# Plot OECD crude flow
+ggplot(df.ie_crude_OECD, aes(x = Year)) +
+  geom_line(aes(y = abs(Exports..ktoe.), color = 'Export')) + 
+  geom_line(aes(y = Imports..ktoe., color = 'Import')) +  
+   ylab('OECD crude (ktoe)') +
+  geom_ribbon(
+    data=subset(df.ie_crude_OECD, Year > as.Date('1970', '%Y')), 
+    aes(x = Year, ymin=abs(Exports..ktoe.),ymax=Imports..ktoe.), 
+    fill="red", 
+    alpha="0.5") +
+   scale_y_continuous(limits = c(0, 1800000), breaks = pretty_breaks(10)) +
+  annotate(
+    "text", 
+    x = as.Date('2004', '%Y'), 
+    y = 1000000, 
+    label = "Net deficit")
+```
+
+```{r}
+# Calculate US percentage of OECD crude net loss
+US_crude <- sum(df.ie_crude_USA$Imports..ktoe. - 
+                  df.ie_crude_USA$Exports..ktoe.)
+OECD_crude <- sum(df.ie_crude_OECD$Imports..ktoe. - 
+                    df.ie_crude_OECD$Exports..ktoe.)
+US_crude/OECD_crude
+
+```
+
+While there are 34 countries in the OECD, the total US crude net deficit makes up 24% percent of the OECD total crude net deficit.  
+
+```{r USA vs. OECD Crude flow, echo=FALSE, message=FALSE, warning=FALSE}
+
+# Plot OECD and US crude flow
+ggplot(df.ie_crude_OECD, aes(x = Year)) +
+  geom_line(aes(y = abs(Exports..ktoe.), color = 'Export')) + 
+  geom_line(aes(y = Imports..ktoe., color = 'Import')) +  
+   ylab('US (front) vs. OECD (back) crude flow (ktoe)') +
+  geom_ribbon(
+    data=subset(df.ie_crude_OECD, Year > as.Date('1970', '%Y')), 
+    aes(x = Year, ymin=abs(Exports..ktoe.),ymax=Imports..ktoe.), 
+    fill="red", 
+    alpha="0.3") +
+   scale_y_continuous(limits = c(0, 1800000), breaks = pretty_breaks(10)) +
+  geom_line(aes(y = abs(df.ie_crude_USA$Exports..ktoe.), color = 'Export')) + 
+  geom_line(aes(y = df.ie_crude_USA$Imports..ktoe., color = 'Import')) +               
+  geom_ribbon(
+    data=subset(df.ie_crude_USA, Year > as.Date('1970', '%Y')), 
+    aes(x = Year, ymin=abs(Exports..ktoe.),ymax=Imports..ktoe.), 
+    fill="red", 
+    alpha="0.75") + 
+  annotate(
+    "text", 
+    x = as.Date('1993', '%Y'), 
+    y = 700000, 
+    label = "US makes up 24% of OECD total crude net deficit")
+```
+
+### Three final charts
+
+I began my analysis by examining US energy products, and quickly shifted my attention to oil. By plotting oil imports and exports together I was able to see that there was a net deficit between 1971 and 2009, which then shifted to a net gain as exports began to exceed imports. This trend increases over the last few years of the dataset. 
+
+```{r One - US oil flow, echo=FALSE, message=FALSE, warning=FALSE}
+
+ggplot(df.imports_exports_USA, aes(x = Year)) +
+  ylab('US oil (ktoe)') +
+  geom_line(aes(y = abs(Exports..ktoe.), color = 'Export')) + 
+  geom_line(aes(y = Imports..ktoe., color = 'Import')) +      
+  scale_x_date(
+    limits = c(as.Date('1971', '%Y'), as.Date('2013', '%Y')), 
+    date_breaks = '5 years', 
+    date_labels = '%Y') +
+  geom_ribbon(
+    data=subset(df.imports_exports_USA, Year < as.Date('2009', '%Y')), 
+    aes(x = Year, ymin=abs(Exports..ktoe.),ymax=Imports..ktoe.), 
+    fill="red", 
+    alpha="0.5") +
+  geom_ribbon(
+    data=subset(df.imports_exports_USA, Year >= as.Date('2008', '%Y')), 
+    aes(x = Year, ymin=abs(Exports..ktoe.),ymax=Imports..ktoe.), 
+    fill="blue", 
+    alpha="0.5") +
+  scale_y_continuous(
+    limits = c(0, 140000), 
+    breaks = pretty_breaks(10)) +
+  annotate(
+    "text", 
+    x = as.Date('1980', '%Y'), 
+    y = 40000, 
+    label = "Net deficit") + 
+  scale_y_continuous(
+    limits = c(0, 140000), 
+    breaks = pretty_breaks(10)) +
+  annotate(
+    "text", 
+    x = as.Date('2013', '%Y'), 
+    y = 100000, 
+    label = "Net gain")
+
+```
+
+Having seen how large US crude imports were in my initial analysis, I plotted these against exports and included a shaded depiction of the US crude net deificit. For comparison, I plotted this against a backdrop of the same relationship (crude imports vs. exports) for the entire OECD, and calculated the US percentage of this total crude net deficit (24%). 
+
+```{r Two- OECD and US crude, echo=FALSE, message=FALSE, warning=FALSE}
+
+# Plot OECD and US crude flow
+ggplot(df.ie_crude_OECD, aes(x = Year)) +
+  geom_line(aes(y = abs(Exports..ktoe.), color = 'Export')) + 
+  geom_line(aes(y = Imports..ktoe., color = 'Import')) +  
+   ylab('US (front) vs. OECD (back) crude flow (ktoe)') +
+  geom_ribbon(
+    data=subset(df.ie_crude_OECD, Year > as.Date('1970', '%Y')), 
+    aes(x = Year, ymin=abs(Exports..ktoe.),ymax=Imports..ktoe.), 
+    fill="red", 
+    alpha="0.3") +
+  scale_y_continuous(limits = c(0, 1800000), breaks = pretty_breaks(10)) +
+  geom_line(aes(y = abs(df.ie_crude_USA$Exports..ktoe.), color = 'Export')) + 
+  geom_line(aes(y = df.ie_crude_USA$Imports..ktoe., color = 'Import')) +               
+  geom_ribbon(
+    data=subset(df.ie_crude_USA, Year > as.Date('1970', '%Y')), 
+    aes(x = Year, ymin=abs(Exports..ktoe.),ymax=Imports..ktoe.), 
+    fill="red", 
+    alpha="0.75") + 
+  annotate(
+    "text", 
+    x = as.Date('1993', '%Y'), 
+    y = 700000, 
+    label = "US makes up 24% of OECD total crude net deficit")
+```
+
+The IEA, the agency responsible for this datasest, is an idependent agency that works in close partnership with the OECD. Given this, it should come as no surprise that this dataset has extensive energy flow data for OECD partners, yet only overview regional data for non-OECD nations and regions. 
+
+That being said, even if we look just at regional crude oil net gains, we can begin to see outlines of the energy flow landscape of nations who export more crude than then import. 
+
+```{r Three - positive crude, echo=FALSE, message=FALSE, warning=FALSE}
+
+# Determine who has positive total net flow
+slices <- c(c1, c2, c3, c4, c5, c6) 
+slices
+
+# Remove Asia (c2) and OECD Total (c6)
+slices <- c(c1, c3, c4, c5)
+
+# Plot pie chart
+lbls <- c("Africa", "Middle East", "Americas", 
+          "Europe and Eurasia")
+pct <- round(slices/sum(slices)*100)
+lbls <- paste(lbls, pct) # add percents to labels 
+lbls <- paste(lbls,"%",sep="") # ad % to labels 
+pie(slices,labels = lbls, col=rainbow(length(lbls)),
+  	main="Percentage of total positive regional net CRUDE flow (1971-2014)")
+
+```
+
+### Reflections
+
+This analysis began with an overview of US energy imports, shifted to a deeper look at US oil and crude, drew comparisons to world crude flow, and ended with a look at regional net flow. This trajectory was inspired by initial observations in my first plot that showed oil and crude to be leading US imports. This analysis was also motivated by my desire to have a fuller picture of how imports related to exports over time, as such an analysis begins to paint a part of the US energy economic picture for these products.
+
+While there were complete sets of datapoints for oil and crude, I was dissapointed to find little to know data for some of the other US products, particularly for Renewables. It was not clear from the documentation whether this lack of data is due to low US participaion in the renewables market or a biproduct of the data collection process. A deeper study of the IEA's data collection methods would be required to answer this question, and would be advised before providing any analysis of these energy products with sparse or no data. 
+
+While I enjoyed the ktoe accuracy in these data, I found myself wishing to plot net deficits and gains in terms of costs (perhaps in USD or GBP). This would require cross-referencing energy trading prices at the time of data collection. Such analysis would help provide a better understanding of specific economic realities of these product types. This includes industry applications, trade restrictions, and efficiency as a fuel source. Such information, combined with cost, could help transform the data here into a more unified picture of global energy value distribution. 
