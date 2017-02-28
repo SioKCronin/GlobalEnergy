@@ -1,6 +1,6 @@
 # GlobalEnergy
 
-[Image](https://cloud.githubusercontent.com/assets/19956669/23389543/7c3e3238-fd1d-11e6-91d2-2e64fca30320.jpeg)
+![Image]https://cloud.githubusercontent.com/assets/19956669/23389543/7c3e3238-fd1d-11e6-91d2-2e64fca30320.jpeg)
 
 [Project Details](https://siokcronin.github.io/GlobalEnergy/EnergyAnalysis.html)
 
